@@ -1,0 +1,166 @@
+---
+title: "Final Project"
+author: "Laura Federline"
+date: "December 7, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+demographic = read.csv("C:\\Users\\drswig\\Videos\\Captures\\NHSdem.csv", header = TRUE)
+questionnaire = read.csv("C:\\Users\\drswig\\Videos\\Captures\\NHSques.csv", header = TRUE)
+```
+
+```{r include=FALSE}
+#Packages
+library(tidyverse)
+library(dplyr)
+library(rpart)
+library(partykit)
+```
+
+```{r}
+#Subsetting datasets and renaming variables
+demo_orig_vars <- c("SEQN","RIAGENDR","RIDAGEYR","RIDRETH1","DMDCITZN","DMDEDUC2","DMDMARTL","DMDHHSIZ","INDHHIN2")
+demo_subset <- demographic[demo_orig_vars]
+demo_rename_vars <- c("SEQN","gender","age","race","citizenship","adult_education","marital_status","number_household","HH_income")
+names(demo_subset) <- demo_rename_vars
+
+q_orig_vars <- c("SEQN","BPQ020","BPQ080","MCQ010","MCQ080","MCQ082","MCQ160F","MCQ220","ALQ101","CBD070","DIQ010","DBQ700","DBD895","FSD032A","HIQ011","HUQ010","IND235","DPQ020","PAQ665","SLD010H","SMQ020","WHQ030","DLQ040","HUQ020")
+q_subset <- questionnaire[q_orig_vars]
+q_rename_vars <- c("SEQN","hypertension","high_cholesterol","asthma","overweight","celiac","stroke","cancer","alcohol","groceries","diabetes","diet","meals_out","food_insecurity","insurance","general_health","monthly_income","feel_depressed","moderate_activity","sleep_hours","smoked","weight_status","difficulty_concentrating","health_compared_1year")
+names(q_subset) <- q_rename_vars
+varlist <- data.frame(q_orig_vars,q_rename_vars)
+varlist
+```
+
+```{r}
+#Merging Datasets
+data <- merge(demo_subset,q_subset,by="SEQN")
+head(data)
+```
+```{r} 
+#Adding in indicator variables
+
+data$ind_cholesterol <- ifelse((data$high_cholesterol == 1), "High Cholesterol", "Not High Cholesterol")
+data$ind_cholesterol1 <- ifelse((data$high_cholesterol == 1), 1, 1)
+
+data$ind_cancer <- ifelse((data$cancer == 1), "Cancer", "No Cancer")
+data$ind_diabetes <- ifelse((data$diabetes == 1), "Diabetic", "Not Diabetic")
+data$ind_cancer1 <- ifelse((data$cancer == 1), 1, 1)
+data$ind_diabetes1 <- ifelse((data$diabetes == 1), 1, 1)
+head(data)
+```
+
+
+```{r}
+
+data_recode = filter(data, hypertension<7 & high_cholesterol<7 & asthma<7 & overweight<7 & celiac<7 & stroke<7 & cancer<7 & alcohol<7 & diabetes<7 & diet<7 & food_insecurity<7 & insurance<7 & general_health<7 & feel_depressed<7 & moderate_activity<7 & smoked<7 & weight_status<7 & difficulty_concentrating<7 & ind_cancer1 < 7 & ind_cholesterol1 < 7 & ind_diabetes1 < 7 & health_compared_1year <7 & HH_income != 77 & HH_income != 99 & sleep_hours < 76)
+
+
+
+race_diabetes <- data_recode %>% group_by(race, ind_diabetes) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE))
+race_diabetes
+
+race_cancer <- data_recode %>% group_by(race, ind_cancer) %>% summarise(Freq=sum(ind_cancer1, na.rm = TRUE))
+race_cancer
+
+gender_diabetes <- data_recode %>% group_by(gender, ind_diabetes) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE))
+gender_diabetes
+
+gender_cancer <- data_recode %>% group_by(gender, ind_cancer) %>% summarise(Freq=sum(ind_cancer1, na.rm = TRUE))
+gender_cancer
+
+gender_race_cancer <- data_recode %>% group_by(gender, race, ind_cancer) %>% summarise(Freq=sum(ind_cancer1, na.rm = TRUE))
+gender_race_cancer
+
+gender_race_diabetes <- data_recode %>% group_by(gender, race, ind_diabetes) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE))
+gender_race_diabetes
+
+gender_race_cancer_diabetes <- data_recode %>% group_by(gender, race, ind_cancer, ind_diabetes) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE) )
+gender_race_cancer_diabetes
+
+gender_race_cancer_diabetes_cholesterol <- data_recode %>% group_by(gender, race, ind_cancer, ind_diabetes, ind_cholesterol) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE) )
+gender_race_cancer_diabetes_cholesterol
+
+gender_cholesterol <- data_recode %>% group_by(gender, ind_cholesterol) %>% summarise(Freq=sum(ind_diabetes1, na.rm = TRUE))
+gender_cholesterol
+
+race_cholesterol <- data_recode %>% group_by(race, ind_cholesterol) %>% summarise(Freq=sum(ind_cancer1, na.rm = TRUE))
+race_cholesterol
+```
+
+
+
+Alluvian for Cancer
+```{r}
+library(ggplot2)
+library(ggalluvial)
+
+#is_alluvia_form(as.data.frame(gender_race_cancer), axes = 1:2, silent = TRUE)
+ggplot(as.data.frame(gender_race_cancer), aes(y = Freq, axis1 = race, axis2 = gender)) +
+  geom_alluvium(aes(fill = ind_cancer), width = 1/12) +
+  geom_stratum(width = 1/12, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", infer.label = TRUE) +
+  scale_x_discrete(limits = c("Race", "Gender"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Race & Cancer")
+
+#is_alluvia_form(as.data.frame(gender_race_diabetes), axes = 1:2, silent = TRUE)
+ggplot(as.data.frame(gender_race_diabetes), aes(y = Freq, axis1 = race, axis2 = gender)) +
+  geom_alluvium(aes(fill = ind_diabetes), width = 1/12) +
+  geom_stratum(width = 1/12, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", infer.label = TRUE) +
+  scale_x_discrete(limits = c("Race", "Gender"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Race & Diabetes")
+
+
+gender_race_cancer_diabetes
+x <- ggplot(as.data.frame(gender_race_cancer_diabetes), aes(y = Freq, axis1 = gender, axis2 = ind_cancer, axis3 = race)) 
+x <- x + geom_alluvium(aes(fill = ind_cancer), width = 0, knot.pos = 0, reverse = FALSE) +  guides(fill = FALSE) 
+x <- x +  geom_stratum(width = 1/8, reverse = FALSE) +  geom_text(stat = "stratum", infer.label = TRUE, reverse = FALSE) +  scale_x_continuous(breaks = 1:3, labels = c("gender", "ind_cancer", "race"))
+x <- x +  coord_flip() 
+x <- x +  ggtitle("Cancer by Race and Gender")
+x
+
+gender_race_cancer_diabetes
+y <- ggplot(as.data.frame(gender_race_cancer_diabetes), aes(y = Freq, axis1 = gender, axis2 = ind_diabetes, axis3 = race)) 
+y <- y + geom_alluvium(aes(fill = ind_diabetes), width = 0, knot.pos = 0, reverse = FALSE) +  guides(fill = FALSE) 
+y <- y +  geom_stratum(width = 1/8, reverse = FALSE) +  geom_text(stat = "stratum", infer.label = TRUE, reverse = FALSE) +  scale_x_continuous(breaks = 1:3, labels = c("gender", "diabetes", "race"))
+y <- y +  coord_flip() 
+y <- y +  ggtitle("Diabetes by Race and Gender")
+y
+
+
+gender_race_cancer_diabetes
+x <- ggplot(as.data.frame(gender_race_cancer_diabetes), aes(y = Freq, axis1 = gender, axis2 = ind_cancer, axis3 = race)) 
+x <- x + geom_alluvium(aes(fill = ind_cancer), width = 0, knot.pos = 0, reverse = FALSE) +  guides(fill = FALSE) 
+x <- x +  geom_stratum(width = 1/8, reverse = FALSE) +  geom_text(stat = "stratum", infer.label = TRUE, reverse = FALSE) +  scale_x_continuous(breaks = 1:3, labels = c("gender", "cancer", "race"))
+x <- x +  coord_flip() 
+x <- x +  ggtitle("Cancer by Race and Gender")
+x
+
+z <- ggplot(as.data.frame(gender_race_cancer_diabetes_cholesterol), aes(y = Freq, axis1 = gender, axis2 = ind_cholesterol, axis3 = race)) 
+z <- z + geom_alluvium(aes(fill = ind_cholesterol), width = 0, knot.pos = 0, reverse = FALSE) +  guides(fill = FALSE) 
+z <- z +  geom_stratum(width = 1/8, reverse = FALSE) +  geom_text(stat = "stratum", infer.label = TRUE, reverse = FALSE) +  scale_x_continuous(breaks = 1:3, labels = c("gender", "cholesterol", "race"))
+z <- z +  coord_flip() 
+z <- z +  ggtitle("High-Cholesterol by Race and Gender")
+z
+
+
+xyz <- ggplot(as.data.frame(gender_race_cancer_diabetes_cholesterol), aes(y = Freq, axis1 = ind_cancer, axis2 = ind_diabetes, axis3 = ind_cholesterol)) 
+xyz <- xyz + geom_alluvium(aes(fill = gender), width = 0, knot.pos = 0, reverse = FALSE) +  guides(fill = FALSE) 
+xyz <- xyz +  geom_stratum(width = 1/8, reverse = FALSE) +  geom_text(stat = "stratum", infer.label = TRUE, reverse = FALSE) +  scale_x_continuous(breaks = 1:3, labels = c("cancer", "diabetes", "cholesterol"))
+xyz <- xyz +  coord_flip() 
+xyz <- xyz +  ggtitle("Cancer, Diabetes, and High-Cholesterol")
+xyz
+
+```
+
+
+
+
